@@ -1,0 +1,51 @@
+# Archivos y carpetas que Unity genera automáticamente
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+UserSettings/
+MemoryCaptures/
+Recordings/
+sysinfo.txt
+
+# Visual Studio
+.vs/
+.vscode/
+*.csproj
+*.sln
+*.user
+*.userprefs
+*.tmp
+*.pidb
+*.suo
+
+# Archivos temporales o de caché
+*.booproj
+*.unityproj
+*.dll
+*.exe
+*.pdb
+*.mdb
+*.log
+
+# Archivos multimedia generados automáticamente
+*.mp4
+*.mov
+*.avi
+*.wav
+*.mp3
+*.png
+*.jpg
+*.jpeg
+*.tga
+*.tif
+*.psd
+
+# Carpetas opcionales que podrían crecer
+Build/
+Builds/
+Library/
+Temp/
+Logs/
