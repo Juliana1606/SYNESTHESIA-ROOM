@@ -673,12 +673,15 @@ MonoBehaviour:
   - {fileID: 1993533885}
   - {fileID: 614868464}
   - {fileID: 1231819097}
-  velocidadTransicion: 0.8
+  velocidadTransicion: 0.38
   usarBancoB: 0
-  saturacionMin: 0.532
-  brilloMin: 0.517
-  pasoMuestreo: 6
+  saturacionMin: 0.45
+  brilloMin: 0.35
+  pasoMuestreo: 5
   umbralPixeles: 200
+  intensidadCamara: 20
+  amplitudZ: 0.8
+  velocidadZ: 0.4
   suavizadoVolumen: 1
   intensidadStereo: 0.686
 --- !u!4 &595862641

@@ -17,7 +17,7 @@ public class Funcionamiento : MonoBehaviour
     private float tiempoUltimoCambio = 0f;
 
     [Header("Rango de profundidad para visuales")]
-    [Range(1f, 10f)] public float rangoProfundidad = 6f;
+    [Range(1f, 20f)] public float rangoProfundidad = 10f;
     
     [Header("Efecto visual 3D")]
     public bool modoCurvado = true;
@@ -26,9 +26,9 @@ public class Funcionamiento : MonoBehaviour
     public AudioSource[] sonidosBancoA = new AudioSource[7];
     public AudioSource[] sonidosBancoB = new AudioSource[7];
     private AudioSource[] sonidosActivos;
-    
+
     [Header("Transición de audio")]
-    [Range(0.1f, 2f)] public float velocidadTransicion = 0.8f;
+    [Range(0.1f, 2f)] public float velocidadTransicion = 0.2f;
 
     [Header("Toggle de banco de audio")]
     public bool usarBancoB = false; // Controlado desde un toggle UI
@@ -38,7 +38,12 @@ public class Funcionamiento : MonoBehaviour
     [Range(0f, 1f)] public float brilloMin = 0.3f;
     public int pasoMuestreo = 3;
     public int umbralPixeles = 200;
+    [Header("Movimiento de cámara")]
+    [Range(5f, 50f)] public float intensidadCamara = 20f;
 
+    [Header("Movimiento rítmico de cámara")]
+    public float amplitudZ = 1f;    // qué tanto avanza o retrocede
+    public float velocidadZ = 0.25f;   // velocidad de oscilación
     [Header("Volumen y mezcla")]
     public float suavizadoVolumen = 0.5f;
     [Range(0f, 1f)] public float intensidadStereo = 0.8f; // Controla qué tan abierto es el estéreo
@@ -185,7 +190,7 @@ public class Funcionamiento : MonoBehaviour
             volumenObjetivo *= Mathf.Lerp(0.6f, 1f, intensidad);
 
             // Aplica un suavizado temporal con velocidad variable
-            float velocidadFade = velocidadTransicion * Time.deltaTime * 8f; 
+            float velocidadFade = velocidadTransicion * Time.deltaTime * 8f;
             float nuevoVolumen = Mathf.Lerp(sonidosActivos[i].volume, volumenObjetivo, velocidadFade);
 
             // Aplica el nuevo volumen
@@ -206,7 +211,7 @@ public class Funcionamiento : MonoBehaviour
                     // Calcular posición promedio de píxeles de este color
                     Vector2 sumaPos = Vector2.zero;
                     int conteo = 0;
-                    
+
 
                     for (int y = alto / 4; y < alto * 3 / 4; y += pasoMuestreo)
                     {
@@ -306,27 +311,107 @@ public class Funcionamiento : MonoBehaviour
                         Renderer rend = visual.GetComponent<Renderer>();
                         if (rend != null)
                         {
-                            Color colorVisual = Color.HSVToRGB((rangosH[i].x + rangosH[i].y) / 2f, 1f, 1f);
+                            float hMedio = HueMedioCircular(rangosH[i]);
+                            Color colorVisual = Color.HSVToRGB(hMedio, 1f, 1f);
                             rend.material.SetColor("_EmissionColor", colorVisual * 2f);
                             rend.material.color = colorVisual;
                         }
 
                         // Si el prefab tiene Particle System, también cambia su color
                         ParticleSystem ps = visual.GetComponent<ParticleSystem>();
+
                         if (ps != null)
                         {
                             var main = ps.main;
-                            main.startColor = Color.HSVToRGB((rangosH[i].x + rangosH[i].y) / 2f, 1f, 1f);
+                            float hMedio = HueMedioCircular(rangosH[i]);
+                            main.startColor = Color.HSVToRGB(hMedio, 1f, 1f);
                         }
 
                         // Destruir visual con fade-out suave
                         StartCoroutine(FadeOutAndDestroy(visual, duracionVisual));
                     }
                 }
-                
+
             }
 
         }
+        // === MOVIMIENTO SUAVE DE CÁMARA HACIA COLOR DOMINANTE ===
+        int indiceDominante = -1;
+        int maxPixeles = 0;
+
+        // Encuentra el color con más píxeles detectados
+        for (int i = 0; i < 7; i++)
+        {
+            if (conteoColor[i] > maxPixeles)
+            {
+                maxPixeles = conteoColor[i];
+                indiceDominante = i;
+            }
+        }
+
+        if (indiceDominante >= 0 && maxPixeles > umbralPixeles / 4)
+        {
+            // Recalcular centro promedio del color dominante
+            Vector2 sumaPos = Vector2.zero;
+            int conteo = 0;
+
+            for (int y = alto / 4; y < alto * 3 / 4; y += pasoMuestreo)
+            {
+                for (int x = ancho / 4; x < ancho * 3 / 4; x += pasoMuestreo)
+                {
+                    Color color = pixeles[y * ancho + x];
+                    Color.RGBToHSV(color, out float h, out float s, out float v);
+                    if (s < saturacionMin || v < brilloMin) continue;
+
+                    bool dentroRango = (rangosH[indiceDominante].x < rangosH[indiceDominante].y)
+                        ? (h >= rangosH[indiceDominante].x && h <= rangosH[indiceDominante].y)
+                        : (h >= rangosH[indiceDominante].x || h <= rangosH[indiceDominante].y);
+
+                    if (dentroRango)
+                    {
+                        sumaPos += new Vector2(x, y);
+                        conteo++;
+                    }
+                }
+            }
+
+            if (conteo > 0)
+            {
+                Vector2 promedio = sumaPos / conteo;
+
+                // Normaliza a rango -1 a 1
+                float xNorm = (promedio.x / ancho - 0.5f) * 2f;
+                float yNorm = (promedio.y / alto - 0.5f) * 2f;
+
+                // Movimiento de cámara según el color más grande
+                float fuerza = Mathf.Clamp01((float)maxPixeles / umbralPixeles) * 0.5f; // 0–0.5
+                Vector3 objetivo = new Vector3(xNorm * fuerza * intensidadCamara, -yNorm * fuerza * (intensidadCamara * 0.75f), 0f);
+
+
+                // Movimiento y rotación suave
+                Camera.main.transform.position = Vector3.Lerp(
+                    Camera.main.transform.position,
+                    new Vector3(objetivo.x, objetivo.y, Camera.main.transform.position.z),
+                    Time.deltaTime * 1.5f
+                );
+
+                Quaternion rotObjetivo = Quaternion.Euler(-yNorm * 15f, xNorm * 25f, 0f);
+                Camera.main.transform.rotation = Quaternion.Slerp(
+                    Camera.main.transform.rotation,
+                    rotObjetivo,
+                    Time.deltaTime * 1.2f
+                );
+            }
+            
+            // 🌊 Movimiento suave adelante-atrás en el eje Z (efecto de respiración)
+            float desplazamientoZ = Mathf.Sin(Time.time * velocidadZ) * amplitudZ;
+
+            // Aplicar movimiento suave en Z manteniendo la posición base
+            Vector3 nuevaPos = Camera.main.transform.position;
+            nuevaPos.z = Mathf.Lerp(nuevaPos.z, -desplazamientoZ, Time.deltaTime * 0.5f);
+            Camera.main.transform.position = nuevaPos;
+        }
+
     }
 
     // ----------------------------------------------------
@@ -395,27 +480,42 @@ public class Funcionamiento : MonoBehaviour
         if (camara != null && camara.isPlaying)
             camara.Stop();
     }
-    IEnumerator FadeOutAndDestroy(GameObject visual, float duracion){
-
-    Renderer rend = visual.GetComponent<Renderer>();
-    float tiempo = 0f;
-
-    if (rend != null && rend.material.HasProperty("_Color"))
+    IEnumerator FadeOutAndDestroy(GameObject visual, float duracion)
     {
-        Color colorInicial = rend.material.color;
 
-        while (tiempo < duracion)
+        Renderer rend = visual.GetComponent<Renderer>();
+        float tiempo = 0f;
+
+        if (rend != null && rend.material.HasProperty("_Color"))
         {
-            tiempo += Time.deltaTime;
-            float t = tiempo / duracion;
-            Color nuevoColor = colorInicial;
-            nuevoColor.a = Mathf.Lerp(1f, 0f, t);
-            rend.material.color = nuevoColor;
-            yield return null;
-        }
-    }
+            Color colorInicial = rend.material.color;
 
-    Destroy(visual);
+            while (tiempo < duracion)
+            {
+                tiempo += Time.deltaTime;
+                float t = tiempo / duracion;
+                Color nuevoColor = colorInicial;
+                nuevoColor.a = Mathf.Lerp(1f, 0f, t);
+                rend.material.color = nuevoColor;
+                yield return null;
+            }
+        }
+
+        Destroy(visual);
+    }
+    
+    // === Cálculo correcto de color medio en HSV (evita que el rojo salga azul) ===
+    float HueMedioCircular(Vector2 rango)
+    {
+        float a = rango.x; // inicio
+        float b = rango.y; // fin
+        if (a <= b)
+            return (a + b) * 0.5f;
+
+        // Cruza el 1→0 (por ejemplo, rojo 0.97–0.03)
+        float mid = (a + (b + 1f)) * 0.5f;
+        if (mid >= 1f) mid -= 1f;
+        return mid;
     }
 
 }
