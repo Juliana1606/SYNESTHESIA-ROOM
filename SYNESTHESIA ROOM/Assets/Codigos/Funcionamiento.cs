@@ -16,11 +16,19 @@ public class Funcionamiento : MonoBehaviour
     private GameObject prefabActual;
     private float tiempoUltimoCambio = 0f;
 
+    [Header("Rango de profundidad para visuales")]
+    [Range(1f, 10f)] public float rangoProfundidad = 6f;
+    
+    [Header("Efecto visual 3D")]
+    public bool modoCurvado = true;
+
     [Header("Bancos de sonidos (A y B)")]
     public AudioSource[] sonidosBancoA = new AudioSource[7];
     public AudioSource[] sonidosBancoB = new AudioSource[7];
     private AudioSource[] sonidosActivos;
-  
+    
+    [Header("Transición de audio")]
+    [Range(0.1f, 2f)] public float velocidadTransicion = 0.8f;
 
     [Header("Toggle de banco de audio")]
     public bool usarBancoB = false; // Controlado desde un toggle UI
@@ -28,7 +36,7 @@ public class Funcionamiento : MonoBehaviour
     [Header("Detección de color (HSV)")]
     [Range(0f, 1f)] public float saturacionMin = 0.4f;
     [Range(0f, 1f)] public float brilloMin = 0.3f;
-    public int pasoMuestreo = 6;
+    public int pasoMuestreo = 3;
     public int umbralPixeles = 200;
 
     [Header("Volumen y mezcla")]
@@ -170,8 +178,17 @@ public class Funcionamiento : MonoBehaviour
             float intensidad = (float)conteoColor[i] / umbralPixeles;
             intensidad = Mathf.Clamp01(intensidad);
 
-            float volumenObjetivo = intensidad;
-            float nuevoVolumen = Mathf.Lerp(sonidosActivos[i].volume, volumenObjetivo, suavizadoVolumen);
+            // Calcula el volumen objetivo según la intensidad (distancia ya incluida)
+            float volumenObjetivo = Mathf.Clamp01(intensidad);
+
+            // Si el sonido está muy cerca (más intenso), dale un extra sutil
+            volumenObjetivo *= Mathf.Lerp(0.6f, 1f, intensidad);
+
+            // Aplica un suavizado temporal con velocidad variable
+            float velocidadFade = velocidadTransicion * Time.deltaTime * 8f; 
+            float nuevoVolumen = Mathf.Lerp(sonidosActivos[i].volume, volumenObjetivo, velocidadFade);
+
+            // Aplica el nuevo volumen
             sonidosActivos[i].volume = nuevoVolumen;
 
             // Simulación de paneo estéreo con control de apertura
@@ -189,6 +206,7 @@ public class Funcionamiento : MonoBehaviour
                     // Calcular posición promedio de píxeles de este color
                     Vector2 sumaPos = Vector2.zero;
                     int conteo = 0;
+                    
 
                     for (int y = alto / 4; y < alto * 3 / 4; y += pasoMuestreo)
                     {
@@ -212,17 +230,76 @@ public class Funcionamiento : MonoBehaviour
 
                     if (conteo > 0)
                     {
-                        Vector2 promedio = sumaPos / conteo;
+                        // Promedio más preciso de los píxeles con mayor brillo (V)
+                        Vector2 sumaPosBrillantes = Vector2.zero;
+                        int conteoBrillantes = 0;
 
-                        // Convertir coordenadas de píxeles (imagen) a coordenadas normalizadas (-1 a 1)
+                        for (int y = alto / 4; y < alto * 3 / 4; y += pasoMuestreo)
+                        {
+                            for (int x = ancho / 4; x < ancho * 3 / 4; x += pasoMuestreo)
+                            {
+                                Color color = pixeles[y * ancho + x];
+                                Color.RGBToHSV(color, out float h, out float s, out float v);
+                                if (s < saturacionMin || v < brilloMin) continue;
+
+                                bool dentroRango = (rangosH[i].x < rangosH[i].y)
+                                    ? (h >= rangosH[i].x && h <= rangosH[i].y)
+                                    : (h >= rangosH[i].x || h <= rangosH[i].y);
+
+                                if (dentroRango && v > 0.7f) // solo los más intensos
+                                {
+                                    sumaPosBrillantes += new Vector2(x, y);
+                                    conteoBrillantes++;
+                                }
+                            }
+                        }
+
+                        Vector2 promedio = (conteoBrillantes > 0) ? (sumaPosBrillantes / conteoBrillantes) : (sumaPos / conteo);
                         float xNorm = (promedio.x / ancho - 0.5f) * 2f;
                         float yNorm = (promedio.y / alto - 0.5f) * 2f;
 
-                        // Crear posición frente a la cámara según la zona detectada
-                        Vector3 posCam = new Vector3(xNorm * 2f, yNorm * 1.5f, 2f);
+                        // Calcular profundidad dinámica según la intensidad del color
+                        float profundidad = Mathf.Lerp(6f, 1.5f, intensidad); // 6 = lejos, 1.5 = cerca
+
+                        // Añadir leve movimiento aleatorio en Z para dar más “vida”
+                        float ruidoZ = Random.Range(-0.3f, 0.3f);
+
+                        // === NUEVO CÁLCULO DE POSICIÓN 3D ===
+                        // Puedes alternar entre un modo más envolvente o plano desde el código
+                        bool modoCurvado = true; // true = inmersivo (semiesfera), false = plano extendido
+
+                        Vector3 posCam;
+
+                        if (modoCurvado)
+                        {
+                            // 🌌 MODO CURVADO ENVOLVENTE (semiesfera alrededor del usuario)
+                            float anguloX = xNorm * Mathf.PI / 2f; // -90° a +90°
+                            float anguloY = yNorm * Mathf.PI / 4f; // -45° a +45°
+                            float radio = Mathf.Lerp(6f, 1.5f, intensidad); // más color = más cerca
+
+                            posCam = new Vector3(
+                                Mathf.Sin(anguloX) * radio,
+                                Mathf.Sin(anguloY) * radio * 0.7f,
+                                Mathf.Cos(anguloX) * radio * 0.9f
+                            );
+                        }
+                        else
+                        {
+                            // 🌈 MODO PLANO EXTENDIDO
+                            float relacionAspecto = (float)ancho / alto;
+                            float profundidadPlano = Mathf.Lerp(6f, 1.5f, intensidad);
+                            float ruidoZPlano = Random.Range(-0.3f, 0.3f);
+
+                            posCam = new Vector3(
+                                xNorm * 4.5f * relacionAspecto,
+                                yNorm * 2.8f,
+                                profundidadPlano + ruidoZPlano
+                            );
+                        }
+
+                        // Convertir coordenadas a posición mundial
                         Vector3 posMundo = Camera.main.transform.TransformPoint(posCam);
 
-                        // Instanciar el visual actual (rayo, nube, humo o estrella)
                         GameObject visual = Instantiate(prefabActual, posMundo, Quaternion.identity);
 
                         // Cambiar color del visual (para materiales normales)

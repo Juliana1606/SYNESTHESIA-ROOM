@@ -655,6 +655,8 @@ MonoBehaviour:
   - {fileID: 6512502790155056697, guid: 9f0e3bbc06f47cf43a366e54b9ece16e, type: 3}
   intervaloCambioVisual: 15
   duracionVisual: 1.5
+  rangoProfundidad: 9
+  modoCurvado: 0
   sonidosBancoA:
   - {fileID: 79002585}
   - {fileID: 1528195103}
@@ -671,13 +673,14 @@ MonoBehaviour:
   - {fileID: 1993533885}
   - {fileID: 614868464}
   - {fileID: 1231819097}
+  velocidadTransicion: 0.8
   usarBancoB: 0
-  saturacionMin: 0.4
-  brilloMin: 0.3
+  saturacionMin: 0.532
+  brilloMin: 0.517
   pasoMuestreo: 6
   umbralPixeles: 200
   suavizadoVolumen: 1
-  intensidadStereo: 0.77
+  intensidadStereo: 0.686
 --- !u!4 &595862641
 Transform:
   m_ObjectHideFlags: 0
