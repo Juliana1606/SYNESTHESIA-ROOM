@@ -1,5 +1,5 @@
 using UnityEngine;
-
+using System.Collections;
 public class Funcionamiento : MonoBehaviour
 {
     [Header("Configuración de cámara")]
@@ -7,13 +7,20 @@ public class Funcionamiento : MonoBehaviour
     public int alto = 480;
     private WebCamTexture camara;
 
+    [Header("Visuales")]
+    public GameObject[] prefabsVisuales;
+    public float intervaloCambioVisual = 60f;
+    
+    [Header("Duración del visual")]
+    public float duracionVisual = 1.5f;
+    private GameObject prefabActual;
+    private float tiempoUltimoCambio = 0f;
+
     [Header("Bancos de sonidos (A y B)")]
     public AudioSource[] sonidosBancoA = new AudioSource[7];
     public AudioSource[] sonidosBancoB = new AudioSource[7];
     private AudioSource[] sonidosActivos;
-    [Header("Visuales de colores detectados ✨")]
-    public GameObject prefabBrillo;
-    public float duracionBrillo = 1.5f;
+  
 
     [Header("Toggle de banco de audio")]
     public bool usarBancoB = false; // Controlado desde un toggle UI
@@ -43,6 +50,7 @@ public class Funcionamiento : MonoBehaviour
         camara.Play();
 
         // Definir rangos HSV de los 7 colores del arcoíris
+        
         rangosH[0] = new Vector2(0.97f, 0.03f); // Rojo
         rangosH[1] = new Vector2(0.03f, 0.08f); // Naranja
         rangosH[2] = new Vector2(0.08f, 0.16f); // Amarillo
@@ -58,7 +66,10 @@ public class Funcionamiento : MonoBehaviour
         // Iniciar con banco A
         sonidosActivos = sonidosBancoA;
 
-        Debug.Log("🎬 Sinestesia Room iniciado (reproducción simultánea + control estéreo)");
+        Debug.Log(" Sinestesia Room iniciado (reproducción simultánea + control estéreo)");
+        // Elegir visual inicial aleatoriamente
+        prefabActual = prefabsVisuales[Random.Range(0, prefabsVisuales.Length)];
+        tiempoUltimoCambio = Time.time;
     }
 
     // ----------------------------------------------------
@@ -68,7 +79,7 @@ public class Funcionamiento : MonoBehaviour
         {
             if (fuente != null)
             {
-                fuente.spatialBlend = 0f; // Modo 2D
+                fuente.spatialBlend = 0f; // Modo 3D
                 fuente.loop = true;
                 fuente.volume = 0f;
                 fuente.pitch = 1f;
@@ -81,7 +92,7 @@ public class Funcionamiento : MonoBehaviour
     // ----------------------------------------------------
     void Update()
     {
-                // 🔸 Pausar / Reanudar con la tecla ESPACIO
+        // Pausar / Reanudar con la tecla ESPACIO
         if (Input.GetKeyDown(KeyCode.Space))
         {
             if (!juegoPausado)
@@ -90,7 +101,7 @@ public class Funcionamiento : MonoBehaviour
                 ReanudarJuego();
         }
 
-        // 🔸 Salir del juego con ESC
+        //Salir del juego con ESC
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             Debug.Log("🚪 Saliendo del juego...");
@@ -103,6 +114,14 @@ public class Funcionamiento : MonoBehaviour
 
 
         if (camara.width <= 16) return;
+
+        // Cambiar de visual cada cierto tiempo
+        if (Time.time - tiempoUltimoCambio >= intervaloCambioVisual)
+        {
+            prefabActual = prefabsVisuales[Random.Range(0, prefabsVisuales.Length)];
+            tiempoUltimoCambio = Time.time;
+            Debug.Log($"🌟 Nuevo visual activo: {prefabActual.name}");
+        }
 
         // Seleccionar banco activo según el toggle
         sonidosActivos = usarBancoB ? sonidosBancoB : sonidosBancoA;
@@ -117,7 +136,7 @@ public class Funcionamiento : MonoBehaviour
 
         int[] conteoColor = new int[7];
 
-        // 🔹 Muestreo rápido (zona central)
+        //Muestreo rápido (zona central)
         for (int y = alto / 4; y < alto * 3 / 4; y += pasoMuestreo)
         {
             for (int x = ancho / 4; x < ancho * 3 / 4; x += pasoMuestreo)
@@ -143,7 +162,7 @@ public class Funcionamiento : MonoBehaviour
             }
         }
 
-        // 🔊 Ajustar volúmenes simultáneamente
+        // Ajustar volúmenes simultáneamente
         for (int i = 0; i < 7; i++)
         {
             if (sonidosActivos[i] == null) continue;
@@ -155,7 +174,7 @@ public class Funcionamiento : MonoBehaviour
             float nuevoVolumen = Mathf.Lerp(sonidosActivos[i].volume, volumenObjetivo, suavizadoVolumen);
             sonidosActivos[i].volume = nuevoVolumen;
 
-            // 🎧 Simulación de paneo estéreo con control de apertura
+            // Simulación de paneo estéreo con control de apertura
             float pan = Mathf.Sin(i * Mathf.PI / 3.5f) * intensidadStereo;
             sonidosActivos[i].panStereo = pan;
 
@@ -164,9 +183,8 @@ public class Funcionamiento : MonoBehaviour
             if (nuevoVolumen > 0.05f)
             {
                 Debug.Log($"▶ Reproduciendo el color {i} - Clip: {sonidosActivos[i].clip.name}");
-
-                   // ✨ Crear visual del color detectado en su posición promedio
-                if (prefabBrillo != null)
+                // Crear visual del color detectado en su posición promedio
+                if (prefabActual != null)
                 {
                     // Calcular posición promedio de píxeles de este color
                     Vector2 sumaPos = Vector2.zero;
@@ -204,23 +222,30 @@ public class Funcionamiento : MonoBehaviour
                         Vector3 posCam = new Vector3(xNorm * 2f, yNorm * 1.5f, 2f);
                         Vector3 posMundo = Camera.main.transform.TransformPoint(posCam);
 
-                        // Instanciar el brillo
-                        GameObject brillo = Instantiate(prefabBrillo, posMundo, Quaternion.identity);
+                        // Instanciar el visual actual (rayo, nube, humo o estrella)
+                        GameObject visual = Instantiate(prefabActual, posMundo, Quaternion.identity);
 
-                        // Cambiar color del brillo
-                        Renderer rend = brillo.GetComponent<Renderer>();
+                        // Cambiar color del visual (para materiales normales)
+                        Renderer rend = visual.GetComponent<Renderer>();
                         if (rend != null)
                         {
-                            Color colorBrillo = Color.HSVToRGB((rangosH[i].x + rangosH[i].y) / 2f, 1f, 1f);
-                            rend.material.SetColor("_EmissionColor", colorBrillo * 2f);
-                            rend.material.color = colorBrillo;
+                            Color colorVisual = Color.HSVToRGB((rangosH[i].x + rangosH[i].y) / 2f, 1f, 1f);
+                            rend.material.SetColor("_EmissionColor", colorVisual * 2f);
+                            rend.material.color = colorVisual;
                         }
 
-                        // Destruir el brillo tras unos segundos
-                        Destroy(brillo, duracionBrillo);
+                        // Si el prefab tiene Particle System, también cambia su color
+                        ParticleSystem ps = visual.GetComponent<ParticleSystem>();
+                        if (ps != null)
+                        {
+                            var main = ps.main;
+                            main.startColor = Color.HSVToRGB((rangosH[i].x + rangosH[i].y) / 2f, 1f, 1f);
+                        }
+
+                        // Destruir visual con fade-out suave
+                        StartCoroutine(FadeOutAndDestroy(visual, duracionVisual));
                     }
                 }
-
                 
             }
 
@@ -293,4 +318,27 @@ public class Funcionamiento : MonoBehaviour
         if (camara != null && camara.isPlaying)
             camara.Stop();
     }
+    IEnumerator FadeOutAndDestroy(GameObject visual, float duracion){
+
+    Renderer rend = visual.GetComponent<Renderer>();
+    float tiempo = 0f;
+
+    if (rend != null && rend.material.HasProperty("_Color"))
+    {
+        Color colorInicial = rend.material.color;
+
+        while (tiempo < duracion)
+        {
+            tiempo += Time.deltaTime;
+            float t = tiempo / duracion;
+            Color nuevoColor = colorInicial;
+            nuevoColor.a = Mathf.Lerp(1f, 0f, t);
+            rend.material.color = nuevoColor;
+            yield return null;
+        }
+    }
+
+    Destroy(visual);
+    }
+
 }
