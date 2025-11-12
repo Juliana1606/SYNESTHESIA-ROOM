@@ -3148,6 +3148,9 @@ MonoBehaviour:
   slider: {fileID: 1010563954}
   sliderValor: 0
   imagenMute: {fileID: 1228563290}
+  sliderBrillo: {fileID: 1896720107}
+  sliderBrilloValor: 0
+  panelBrillo: {fileID: 853029406}
 --- !u!4 &2110877663
 Transform:
   m_ObjectHideFlags: 0
