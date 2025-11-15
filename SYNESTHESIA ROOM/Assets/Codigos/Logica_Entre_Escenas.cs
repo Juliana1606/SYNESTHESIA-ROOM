@@ -33,7 +33,8 @@ public class Logica_Entre_Escenas : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        
+        panelInicio.SetActive(true);
+        panelOpciones.SetActive(false);
     }
 
     // Update is called once per frame
