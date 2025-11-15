@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections.Generic;
-using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 public class Control_Volumen : MonoBehaviour
@@ -21,39 +20,26 @@ public class Control_Volumen : MonoBehaviour
     Resolution[] resoluciones;
 
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+     
         slider.value = PlayerPrefs.GetFloat("VolumenAudio", 0.5f);
         AudioListener.volume = slider.value;
         RevisarSiEstoyMute();
 
         sliderBrillo.value = PlayerPrefs.GetFloat("BrilloPantalla", 0.5f);
-        panelBrillo.color = new Color(panelBrillo.color.r,panelBrillo.color.g,panelBrillo.color.b,sliderBrillo.value);
+        panelBrillo.color = new Color(panelBrillo.color.r, panelBrillo.color.g, panelBrillo.color.b, sliderBrillo.value);
 
-        if (Screen.fullScreen)
-        {
-            togglePantallaCompleta.isOn = true;
-        }
-        else
-        {
-            togglePantallaCompleta.isOn = false;
-        }
+        togglePantallaCompleta.isOn = Screen.fullScreen;
 
-        calidad=PlayerPrefs.GetInt("numeroDeCalidad",3);
-        dropdownResoluciones.value=calidad;
-        AjustarCalidad();
+        calidad = PlayerPrefs.GetInt("numeroDeCalidad", 3);
 
-        if (Screen.fullScreen)
-        {
-            togglePantallaCompleta.isOn = true;
-        }
-        else
-        {
-            togglePantallaCompleta.isOn = false;
-        }
+        RevisarResolucion();  // ← primero cargar resoluciones
 
-        RevisarResolucion();
+        dropdownResoluciones.value = PlayerPrefs.GetInt("numeroResolucion", 0);
+        dropdownResoluciones.RefreshShownValue();
+
+        AjustarCalidad(); // ← ahora sí ajustar calidad
 
 
     }
@@ -87,12 +73,6 @@ public class Control_Volumen : MonoBehaviour
     {
         Screen.fullScreen = pantallaCompleta;
     }
-    public void AjustarCalidad()
-    {
-        QualitySettings.SetQualityLevel(dropdownResoluciones.value);
-        PlayerPrefs.SetInt("numeroDeCalidad", dropdownResoluciones.value);
-        calidad=dropdownResoluciones.value;
-    }
     public void RevisarResolucion()
     {
         resoluciones= Screen.resolutions;
@@ -111,13 +91,26 @@ public class Control_Volumen : MonoBehaviour
             }
         }
         dropdownResoluciones.AddOptions(opciones);
-        dropdownResoluciones.value= resolucionActual;
+        
         dropdownResoluciones.RefreshShownValue();
+        //
+        dropdownResoluciones.value=PlayerPrefs.GetInt("numeroResolucion",0);
+        //
 
     }
+    public void AjustarCalidad()
+    {
+        QualitySettings.SetQualityLevel(dropdownResolucion.value);
+
+        PlayerPrefs.SetInt("numeroDeCalidad", dropdownResoluciones.value);
+        calidad=dropdownResoluciones.value;
+    }
+    
 
     public void CambiarResolucion(int indiceResolucion)
     {
+        //
+        PlayerPrefs.SetInt("numeroResolucion", dropdownResoluciones.value);
         Resolution resolucion=resoluciones[indiceResolucion];
         Screen.SetResolution(resolucion.width, resolucion.height, Screen.fullScreen);
     }
