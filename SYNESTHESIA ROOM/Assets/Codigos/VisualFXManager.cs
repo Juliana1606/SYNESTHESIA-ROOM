@@ -3,77 +3,121 @@ using UnityEngine;
 public class VisualFXManager : MonoBehaviour
 {
     [Header("Prefab del visual")]
-    public GameObject visualPrefab;
+    public GameObject prefabVisual;
 
-    [Header("Opciones de Spawn")]
-    public int cantidad = 5;
-    public Vector3 areaDeSpawn = new Vector3(10, 5, 10);
+    [Header("Configuración de spawn")]
+    public float distanciaFrenteCamara = 3f;
+    public float radioSpawn = 2f;
+    public float intervaloSpawn = 0.5f;
 
-    [Header("Movimiento")]
-    public float velocidadMovimiento = 2f;
+    [Header("Movimiento del visual")]
+    public float velocidadMovimiento = 1f;
+    public float amplitudMovimiento = 0.5f;
 
-    [Header("Colores arcoiris")]
-    public float velocidadColor = 1f;
+    [Header("Duración")]
+    public float duracionVisual = 3f;
 
-    void Start()
+    private float tiempoUltimoSpawn;
+
+    void Update()
     {
-        // Crear todos los visuales
-        for (int i = 0; i < cantidad; i++)
+        // Instanciar visual por intervalo
+        if (Time.time > tiempoUltimoSpawn + intervaloSpawn)
         {
-            CrearVisual();
+            GenerarVisual();
+            tiempoUltimoSpawn = Time.time;
         }
     }
 
-    void CrearVisual()
+    void GenerarVisual()
     {
-        // Posición inicial aleatoria
-        Vector3 pos = new Vector3(
-            Random.Range(-areaDeSpawn.x, areaDeSpawn.x),
-            Random.Range(-areaDeSpawn.y, areaDeSpawn.y),
-            Random.Range(-areaDeSpawn.z, areaDeSpawn.z)
+        if (prefabVisual == null) return;
+
+        // POSICIÓN EN 3D FRENTE A LA CÁMARA
+        Vector3 posBase = Camera.main.transform.position + Camera.main.transform.forward * distanciaFrenteCamara;
+
+        // Variación aleatoria para que aparezca por toda la pantalla
+        Vector3 offset = new Vector3(
+            Random.Range(-radioSpawn, radioSpawn),
+            Random.Range(-radioSpawn, radioSpawn),
+            0f
         );
 
-        // Instanciar
-        GameObject instance = Instantiate(visualPrefab, pos, Quaternion.identity);
+        Vector3 posFinal = posBase + Camera.main.transform.TransformVector(offset);
 
-        // Añadir el script de comportamiento en runtime
-        instance.AddComponent<VisualBehaviour>();
+        // CREAR VISUAL
+        GameObject v = Instantiate(prefabVisual, posFinal, Quaternion.identity);
+
+        // AÑADIR COMPONENTE DINÁMICO
+        v.AddComponent<RainbowMover>();
+        RainbowMover mover = v.GetComponent<RainbowMover>();
+
+        mover.amplitud = amplitudMovimiento;
+        mover.velocidad = velocidadMovimiento;
+        mover.duracion = duracionVisual;
     }
 }
 
 
+// =========================================================
+// MOVIMIENTO + CAMBIO DE COLOR EN ARCOÍRIS
+// =========================================================
 
-public class VisualBehaviour : MonoBehaviour
+public class RainbowMover : MonoBehaviour
 {
-    Renderer rend;
-    Vector3 direccion;
+    public float velocidad = 1f;
+    public float amplitud = 0.5f;
+    public float duracion = 2f;
 
-    float velocidad = 1.5f;     // movimiento
-    float colorSpeed = 1.5f;    // velocidad del arcoiris
+    private float tiempoVida = 0f;
+    private Renderer rend;
+    private Vector3 posicionInicial;
 
     void Start()
     {
-        // Tomar renderer (aunque esté en hijos)
-        rend = GetComponentInChildren<Renderer>();
-
-        // Dirección aleatoria
-        direccion = Random.insideUnitSphere.normalized;
+        posicionInicial = transform.position;
+        rend = GetComponent<Renderer>();
     }
 
     void Update()
     {
-        // Movimiento suave
-        transform.position += direccion * velocidad * Time.deltaTime;
+        tiempoVida += Time.deltaTime;
 
-        // Cambiar dirección de vez en cuando
-        if (Random.value < 0.01f)
-            direccion = Random.insideUnitSphere.normalized;
+        // === MOVIMIENTO ===
+        float m = Mathf.Sin(Time.time * velocidad) * amplitud;
+        transform.position = posicionInicial + new Vector3(
+            m,
+            m,
+            Mathf.Sin(Time.time * velocidad * 0.7f) * amplitud
+        );
 
-        // Animación de colores arcoiris
-        if (rend != null)
+        // === CAMBIO DE COLOR DE ARCOÍRIS ===
+        // === CAMBIO DE COLOR DE ARCOIRIS PARA PARTICLE SYSTEM ===
+        ParticleSystem ps = GetComponent<ParticleSystem>();
+        if (ps != null)
         {
-            float t = (Mathf.Sin(Time.time * colorSpeed) + 1f) / 2f;
-            rend.material.color = Color.HSVToRGB(t, 1, 1);
+            var main = ps.main;
+            float h = Mathf.Repeat(Time.time * 0.3f, 1f);
+            Color c = Color.HSVToRGB(h, 1f, 1f);
+
+            main.startColor = c;
+        }
+        else if (rend != null)
+        {
+            // fallback si el prefab NO es particle system
+            float h = Mathf.Repeat(Time.time * 0.3f, 1f);
+            Color c = Color.HSVToRGB(h, 1f, 1f);
+
+            rend.material.color = c;
+
+            if (rend.material.HasProperty("_EmissionColor"))
+                rend.material.SetColor("_EmissionColor", c * 2f);
+        }
+
+        // === DESTRUIR DESPUÉS DE SU DURACIÓN ===
+        if (tiempoVida >= duracion)
+        {
+            Destroy(gameObject);
         }
     }
 }
